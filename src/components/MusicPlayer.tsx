@@ -66,7 +66,7 @@ const MusicPlayer: React.FC = () => {
       >
         {/* In a real implementation, you'd have an actual audio file */}
         {/* For demo purposes, we'll use a data URL with a simple tone */}
-        <source src="musik/lagu.mp3" type="audio/wav" />
+        <source src="/musik/lagu.mp3" type="audio/wav" />
         Your browser does not support the audio element.
       </audio>
     </div>
