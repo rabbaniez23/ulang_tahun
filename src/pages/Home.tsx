@@ -35,8 +35,8 @@ const Home: React.FC = () => {
           {/* Hero Section */}
           <div className="text-center mb-16">
             <div className="relative">
-              <h1 className="text-xl md:text-xl font-dancing font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 mb-4 animate-pulse">
-              Kado special dari aku buat kamu
+              <h1 className="text-2xl md:text-2xl font-dancing font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 mb-4 animate-pulse">
+              Kado special dari monecruzz
               </h1>
               <br></br>
               <div className="absolute -top-4 -right-4 text-4xl animate-spin-slow">
