@@ -33,6 +33,7 @@ const Countdown: React.FC = () => {
   return (
     <div className="text-center mt-10 bg-purple-50 p-6 rounded-xl shadow-lg max-w-md mx-auto">
       <h2 className="flex justify-center gap-4 text-lg font-bold text-purple-800">ini countdown ke ulang tahun selanjutnya 🎉</h2>
+      <br></br>
       <div className="flex justify-center gap-4 text-lg font-semibold text-purple-800">
         <div className="text-center">
           <div className="text-xl">{String(timeLeft.days).padStart(2, '0')}</div>
