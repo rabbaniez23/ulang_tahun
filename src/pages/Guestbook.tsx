@@ -56,10 +56,10 @@ const Guestbook: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-5xl md:text-6xl font-dancing font-bold text-purple-800 mb-4">
+          <h1 className="text-2xl md:text-2xl font-dancing font-bold text-purple-800 mb-4">
             💌 kotak harapan
           </h1>
-          <p className="text-xl text-purple-700 mb-8">
+          <p className="text-l text-purple-700 mb-8">
             kasih harapan ke aghni ya teman teman
           </p>
         </div>
