@@ -18,7 +18,7 @@ const Navigation: React.FC = () => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-2">
             <Cake className="h-8 w-8 text-white animate-bounce" />
-            <span className="text-white font-bold text-xl font-dancing">ulang tahun aghni</span>
+            <span className="text-white font-bold text-l font-dancing">aghni's birthday</span>
           </div>
           
           <div className="hidden md:block">
