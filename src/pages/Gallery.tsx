@@ -1,35 +1,46 @@
+// src/pages/Gallery.tsx
 import React, { useState, useEffect } from 'react';
 import { Upload, X, Calendar, Camera } from 'lucide-react';
 import { Photo } from '../types';
-import { db, storage } from '../firebaseConfig'; // Import storage
-import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // Import Storage functions
+import { db } from '../firebaseConfig'; // Import instance Firestore kamu
+import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore'; // Import fungsi Firestore
 
 const Gallery: React.FC = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
-  const [newPhoto, setNewPhoto] = useState<Omit<Photo, 'id'>>({ url: '', caption: '' });
+  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [showUpload, setShowUpload] = useState(false);
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null); // New state for the actual file
+  const [newPhoto, setNewPhoto] = useState({ url: '', caption: '' });
+  const [loading, setLoading] = useState(true); // State untuk loading
 
+  // Referensi ke koleksi 'photos' di Firestore
   const photosCollectionRef = collection(db, 'photos');
 
+  // Efek untuk memuat foto dari Firebase Firestore
   useEffect(() => {
     const getPhotos = async () => {
-      const q = query(photosCollectionRef, orderBy('uploadDate', 'desc'));
+      setLoading(true);
+      const q = query(photosCollectionRef, orderBy('uploadDate', 'desc')); // Urutkan berdasarkan tanggal upload terbaru
       const data = await getDocs(q);
-      setPhotos(data.docs.map(doc => ({ ...doc.data(), id: doc.id } as Photo)));
+      const fetchedPhotos: Photo[] = data.docs.map((document) => ({
+        ...(document.data() as Photo), // Pastikan data sesuai dengan interface Photo
+        id: document.id // ID dokumen dari Firestore
+      }));
+      setPhotos(fetchedPhotos);
+      setLoading(false);
     };
 
     getPhotos();
-  }, []);
+  }, []); // Hanya berjalan sekali saat komponen dimuat
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setFileToUpload(file); // Store the file itself
+      // FileReader untuk mengonversi file gambar menjadi Data URL
+      // Catatan: Menyimpan Data URL di Firestore bisa sangat besar dan tidak efisien.
+      // Untuk aplikasi yang lebih besar, sebaiknya gunakan Firebase Storage untuk menyimpan gambar
+      // dan hanya simpan URL gambar di Firestore.
       const reader = new FileReader();
       reader.onload = (e) => {
-        // Still set the Data URL for preview purposes
         setNewPhoto(prev => ({ ...prev, url: e.target?.result as string }));
       };
       reader.readAsDataURL(file);
@@ -37,24 +48,19 @@ const Gallery: React.FC = () => {
   };
 
   const addPhoto = async () => {
-    if (fileToUpload && newPhoto.caption) { // Check for fileToUpload and caption
+    if (newPhoto.url && newPhoto.caption) {
       try {
-        // 1. Upload the image to Firebase Storage
-        const storageRef = ref(storage, `photos/${fileToUpload.name}-${Date.now()}`);
-        const uploadResult = await uploadBytes(storageRef, fileToUpload);
-        const imageUrl = await getDownloadURL(uploadResult.ref);
-
-        // 2. Save the image URL and other metadata to Firestore
-        const photoData = {
-          url: imageUrl, // Use the URL from Firebase Storage
+        const photoData = { // Data yang akan disimpan ke Firestore
+          url: newPhoto.url,
           caption: newPhoto.caption,
           uploadDate: new Date().toISOString()
         };
         const docRef = await addDoc(photosCollectionRef, photoData);
 
+        // Perbarui state lokal dengan data yang baru ditambahkan (termasuk ID dari Firestore)
         setPhotos(prevPhotos => [{ ...photoData, id: docRef.id }, ...prevPhotos]);
+        
         setNewPhoto({ url: '', caption: '' });
-        setFileToUpload(null); // Reset the file after upload
         setShowUpload(false);
       } catch (e) {
         console.error("Error adding document: ", e);
@@ -63,99 +69,160 @@ const Gallery: React.FC = () => {
     }
   };
 
-  const deletePhoto = async (id: string) => {
-    const photoDoc = doc(db, 'photos', id);
-    await deleteDoc(photoDoc);
-    setPhotos(photos.filter(photo => photo.id !== id));
-  };
-
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-purple-100 via-pink-100 to-red-100 py-10 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl sm:text-5xl font-extrabold text-center text-gray-800 mb-8 drop-shadow-md">
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-500 to-pink-500">
-            Galeri Momen Berharga
-          </span>
-        </h1>
-
-        <div className="text-center mb-10">
+    <div className="min-h-screen bg-gradient-to-br from-purple-200 via-pink-200 to-purple-300 pt-20 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-2xl md:text-2xl font-dancing font-bold text-purple-800 mb-4">
+            📸your memory
+          </h1>
+          <p className="text-xl text-purple-700 mb-8">
+            semoga bisa jadi kenangan
+          </p>
+          
           <button
-            onClick={() => setShowUpload(!showUpload)}
-            className="bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center mx-auto"
+            onClick={() => setShowUpload(true)}
+            className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-8 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center space-x-2 mx-auto"
           >
-            <Upload className="mr-2" size={20} />
-            {showUpload ? 'Sembunyikan Form Unggah' : 'Unggah Foto Baru'}
+            <Upload size={20} />
+            <span>tambah foto untuk aghni disini</span>
           </button>
         </div>
 
-        {showUpload && (
-          <div className="bg-white p-6 rounded-xl shadow-xl mb-10 border border-gray-200 animate-fade-in-down">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Unggah Foto Baru</h2>
-            <div className="mb-4">
-              <label htmlFor="file-upload" className="block text-gray-700 text-sm font-bold mb-2">Pilih Gambar:</label>
-              <input
-                type="file"
-                id="file-upload"
-                accept="image/*"
-                onChange={handleFileUpload}
-                className="block w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-full file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-purple-50 file:text-purple-700
-                  hover:file:bg-purple-100"
-              />
+        {/* Photo Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+          {loading ? (
+            <p className="text-center text-gray-500 col-span-full">Memuat foto...</p>
+          ) : photos.length === 0 ? (
+            <div className="text-center py-12 col-span-full">
+              <Camera className="mx-auto text-gray-400 mb-4" size={48} />
+              <p className="text-gray-500 text-lg">Belum ada foto yang diupload.</p>
             </div>
-            {newPhoto.url && (
-              <div className="mb-4 text-center">
-                <img src={newPhoto.url} alt="Preview" className="max-w-xs max-h-48 mx-auto rounded-lg shadow-md border border-gray-200" />
+          ) : (
+            photos.map((photo) => (
+              <div
+                key={photo.id}
+                className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer"
+                onClick={() => setSelectedPhoto(photo)}
+              >
+                <div className="aspect-square relative overflow-hidden">
+                  <img
+                    src={photo.url}
+                    alt={photo.caption}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute bottom-2 left-2 right-2 text-white opacity-0 hover:opacity-100 transition-opacity duration-300">
+                    <Camera size={16} className="inline mr-1" />
+                    <span className="text-sm">{photo.caption}</span>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <p className="font-semibold text-gray-800 truncate">{photo.caption}</p>
+                  <p className="text-sm text-gray-500 flex items-center mt-1">
+                    <Calendar size={12} className="mr-1" />
+                    {new Date(photo.uploadDate).toLocaleDateString()}
+                  </p>
+                </div>
               </div>
-            )}
-            <div className="mb-6">
-              <label htmlFor="caption" className="block text-gray-700 text-sm font-bold mb-2">Keterangan Foto:</label>
-              <input
-                type="text"
-                id="caption"
-                value={newPhoto.caption}
-                onChange={(e) => setNewPhoto(prev => ({ ...prev, caption: e.target.value }))}
-                placeholder="Tambahkan keterangan untuk foto ini..."
-                className="shadow appearance-none border rounded-lg w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
+            ))
+          )}
+        </div>
+
+        {/* Upload Modal */}
+        {showUpload && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-purple-800">tambah foto baru</h3>
+                <button
+                  onClick={() => setShowUpload(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Choose Photo
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                {newPhoto.url && (
+                  <div className="aspect-square relative overflow-hidden rounded-lg">
+                    <img
+                      src={newPhoto.url}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Caption
+                  </label>
+                  <input
+                    type="text"
+                    value={newPhoto.caption}
+                    onChange={(e) => setNewPhoto(prev => ({ ...prev, caption: e.target.value }))}
+                    placeholder="Add a beautiful caption..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+                
+                <button
+                  onClick={addPhoto}
+                  disabled={!newPhoto.url || !newPhoto.caption}
+                  className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:scale-105 transition-all duration-300"
+                >
+                  Add Photo
+                </button>
+              </div>
             </div>
-            <button
-              onClick={addPhoto}
-              disabled={!fileToUpload || !newPhoto.caption} // Disable if no file or no caption
-              className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:scale-105 transition-all duration-300"
-            >
-              Add Photo
-            </button>
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {photos.map((photo) => (
-            <div key={photo.id} className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200 transform transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
-              <div className="relative w-full h-48 overflow-hidden">
-                <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover" loading="lazy" />
+        {/* Photo Modal */}
+        {selectedPhoto && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-6 max-w-4xl max-h-[90vh] overflow-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-2xl font-bold text-purple-800">{selectedPhoto.caption}</h3>
                 <button
-                  onClick={() => deletePhoto(photo.id)}
-                  className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-md hover:bg-red-600 transition-colors duration-200"
-                  aria-label="Delete photo"
+                  onClick={() => setSelectedPhoto(null)}
+                  className="text-gray-500 hover:text-gray-700"
                 >
-                  <X size={18} />
+                  <X size={24} />
                 </button>
               </div>
-              <div className="p-4">
-                <p className="text-gray-800 font-semibold mb-2">{photo.caption}</p>
-                <div className="flex items-center text-gray-500 text-sm">
-                  <Calendar size={16} className="mr-1" />
-                  <span>{new Date(photo.uploadDate).toLocaleDateString()}</span>
-                </div>
+              
+              <div className="mb-4">
+                <img
+                  src={selectedPhoto.url}
+                  alt={selectedPhoto.caption}
+                  className="w-full max-h-96 object-contain rounded-lg"
+                />
               </div>
+              
+              <p className="text-gray-600 flex items-center">
+                <Calendar size={16} className="mr-2" />
+                Added on {new Date(selectedPhoto.uploadDate).toLocaleDateString()}
+              </p>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
+      
     </div>
   );
 };
