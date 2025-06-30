@@ -1,17 +1,16 @@
+// src/pages/Gallery.tsx
 import React, { useState, useEffect } from 'react';
 import { Upload, X, Calendar, Camera } from 'lucide-react';
 import { Photo } from '../types';
-import { db, storage } from '../firebaseConfig'; // Import db dan storage
-import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'; // Import fungsi Storage
+import { db } from '../firebaseConfig'; // Import instance Firestore kamu
+import { collection, getDocs, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore'; // Import fungsi Firestore
 
 const Gallery: React.FC = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [showUpload, setShowUpload] = useState(false);
-  const [newPhoto, setNewPhoto] = useState<Omit<Photo, 'id'>>({ url: '', caption: '' });
+  const [newPhoto, setNewPhoto] = useState({ url: '', caption: '' });
   const [loading, setLoading] = useState(true); // State untuk loading
-  const [fileToUpload, setFileToUpload] = useState<File | null>(null); // State baru untuk file yang akan diunggah
 
   // Referensi ke koleksi 'photos' di Firestore
   const photosCollectionRef = collection(db, 'photos');
@@ -36,10 +35,12 @@ const Gallery: React.FC = () => {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      setFileToUpload(file); // Simpan file sebenarnya
+      // FileReader untuk mengonversi file gambar menjadi Data URL
+      // Catatan: Menyimpan Data URL di Firestore bisa sangat besar dan tidak efisien.
+      // Untuk aplikasi yang lebih besar, sebaiknya gunakan Firebase Storage untuk menyimpan gambar
+      // dan hanya simpan URL gambar di Firestore.
       const reader = new FileReader();
       reader.onload = (e) => {
-        // Gunakan Data URL untuk preview di modal sebelum upload
         setNewPhoto(prev => ({ ...prev, url: e.target?.result as string }));
       };
       reader.readAsDataURL(file);
@@ -47,16 +48,10 @@ const Gallery: React.FC = () => {
   };
 
   const addPhoto = async () => {
-    if (fileToUpload && newPhoto.caption) { // Periksa apakah ada file dan caption
+    if (newPhoto.url && newPhoto.caption) {
       try {
-        // 1. Unggah gambar ke Firebase Storage
-        const storageRef = ref(storage, `photos/${fileToUpload.name}-${Date.now()}`);
-        const uploadResult = await uploadBytes(storageRef, fileToUpload);
-        const imageUrl = await getDownloadURL(uploadResult.ref); // Dapatkan URL publik gambar
-
-        // 2. Simpan URL gambar dan metadata lainnya ke Firestore
-        const photoData = {
-          url: imageUrl, // Gunakan URL dari Firebase Storage
+        const photoData = { // Data yang akan disimpan ke Firestore
+          url: newPhoto.url,
           caption: newPhoto.caption,
           uploadDate: new Date().toISOString()
         };
@@ -65,31 +60,12 @@ const Gallery: React.FC = () => {
         // Perbarui state lokal dengan data yang baru ditambahkan (termasuk ID dari Firestore)
         setPhotos(prevPhotos => [{ ...photoData, id: docRef.id }, ...prevPhotos]);
         
-        // Reset form setelah upload
         setNewPhoto({ url: '', caption: '' });
-        setFileToUpload(null);
         setShowUpload(false);
       } catch (e) {
         console.error("Error adding document: ", e);
         alert("Gagal menambahkan foto. Coba lagi!");
       }
-    }
-  };
-
-  const deletePhoto = async (id: string) => {
-    // Implementasi untuk menghapus foto dari Firestore (dan mungkin dari Storage juga jika diinginkan)
-    // Untuk kesederhanaan, hanya menghapus dari Firestore di sini.
-    // Menghapus dari Storage memerlukan lebih banyak kode (misalnya, menyimpan path storage di Firestore)
-    try {
-      const photoDoc = doc(db, 'photos', id);
-      await deleteDoc(photoDoc);
-      setPhotos(photos.filter(photo => photo.id !== id));
-      if (selectedPhoto?.id === id) {
-        setSelectedPhoto(null); // Tutup modal jika foto yang dihapus sedang dilihat
-      }
-    } catch (e) {
-      console.error("Error deleting document: ", e);
-      alert("Gagal menghapus foto. Coba lagi!");
     }
   };
 
@@ -127,7 +103,7 @@ const Gallery: React.FC = () => {
             photos.map((photo) => (
               <div
                 key={photo.id}
-                className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer relative group" // Added relative and group
+                className="bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transform hover:scale-105 transition-all duration-300 cursor-pointer"
                 onClick={() => setSelectedPhoto(photo)}
               >
                 <div className="aspect-square relative overflow-hidden">
@@ -135,27 +111,19 @@ const Gallery: React.FC = () => {
                     src={photo.url}
                     alt={photo.caption}
                     className="w-full h-full object-cover"
-                    loading="lazy"
                   />
-                  {/* Delete Button (moved inside the photo card for direct access) */}
-                  <button
-                    onClick={(e) => { // Prevent card click when deleting
-                      e.stopPropagation(); 
-                      deletePhoto(photo.id);
-                    }}
-                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-red-600"
-                    aria-label="Hapus foto"
-                  >
-                    <X size={18} />
-                  </button>
-                  {/* Overlay for caption on hover */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-4 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <span className="text-sm font-medium">{photo.caption}</span>
-                    <p className="text-xs text-gray-300 flex items-center mt-1">
-                      <Calendar size={12} className="mr-1" />
-                      {new Date(photo.uploadDate).toLocaleDateString()}
-                    </p>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute bottom-2 left-2 right-2 text-white opacity-0 hover:opacity-100 transition-opacity duration-300">
+                    <Camera size={16} className="inline mr-1" />
+                    <span className="text-sm">{photo.caption}</span>
                   </div>
+                </div>
+                <div className="p-4">
+                  <p className="font-semibold text-gray-800 truncate">{photo.caption}</p>
+                  <p className="text-sm text-gray-500 flex items-center mt-1">
+                    <Calendar size={12} className="mr-1" />
+                    {new Date(photo.uploadDate).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
             ))
@@ -189,7 +157,7 @@ const Gallery: React.FC = () => {
                   />
                 </div>
                 
-                {newPhoto.url && ( // newPhoto.url digunakan untuk preview
+                {newPhoto.url && (
                   <div className="aspect-square relative overflow-hidden rounded-lg">
                     <img
                       src={newPhoto.url}
@@ -214,7 +182,7 @@ const Gallery: React.FC = () => {
                 
                 <button
                   onClick={addPhoto}
-                  disabled={!fileToUpload || !newPhoto.caption} // Perbarui kondisi disabled
+                  disabled={!newPhoto.url || !newPhoto.caption}
                   className="w-full bg-gradient-to-r from-pink-500 to-purple-500 text-white py-3 rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transform hover:scale-105 transition-all duration-300"
                 >
                   Add Photo
